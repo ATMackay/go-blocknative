@@ -62,7 +62,7 @@ func New(ctx context.Context, opts Opts) (*Client, error) {
 	}
 	if out.Status != "ok" {
 		cancel()
-		return nil, errors.Errorf("failed to initialize websockets connection reason:", out.Reason)
+		return nil, errors.Errorf("failed to initialize websockets connection reason: %v", out.Reason)
 	}
 	if opts.PrintConnectResponse {
 		log.Printf("%+v\n", out)

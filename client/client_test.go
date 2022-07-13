@@ -32,7 +32,6 @@ func TestClient(t *testing.T) {
 				"0xfa6de2697D59E88Ed7Fc4dFE5A33daC43565ea41",
 				false,
 				[]string{logSwapABI},
-				nil,
 			),
 		)),
 	)
