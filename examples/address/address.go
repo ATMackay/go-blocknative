@@ -2,18 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
-	"github.com/bonedaddy/go-blocknative/client"
+	"github.com/ATMackay/go-blocknative/client"
 	"github.com/gorilla/websocket"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		fmt.Printf("error reading env file: %v", err)
-	}
 
 	// create the base client struct
 	cl, err := client.New(context.Background(), client.Opts{

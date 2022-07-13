@@ -21,6 +21,11 @@ type Blockchain struct {
 	Network string `json:"network"`
 }
 
+// Subscription implements
+type Subscrption interface {
+	BaseMessage()
+}
+
 // TxSubscribe is used to subscribe/unsubscribe to transaction id events
 type TxSubscribe struct {
 	BaseMessage

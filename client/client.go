@@ -33,12 +33,13 @@ type ConnectResponse struct {
 
 // Client wraps gorilla websocket connections
 type Client struct {
-	conn    *websocket.Conn
-	ctx     context.Context
-	cancel  context.CancelFunc
-	initMsg BaseMessage // used to resend the initialization msg if connection drops
-	apiKey  string
-	mtx     sync.RWMutex
+	conn                 *websocket.Conn
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	initMsg              BaseMessage // used to resend the initialization msg if connection drops
+	apiKey               string
+	mtx                  sync.RWMutex
+	subscriptionRegistry map[string]Subscrption
 }
 
 // New returns a new blocknative websocket client
