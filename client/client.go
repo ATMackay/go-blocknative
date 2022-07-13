@@ -2,14 +2,12 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/url"
-	"strconv"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 )
 
 // Opts provides configuration over the websocket connection
@@ -39,7 +37,7 @@ type Client struct {
 	initMsg              BaseMessage // used to resend the initialization msg if connection drops
 	apiKey               string
 	mtx                  sync.RWMutex
-	subscriptionRegistry map[string]Subscrption
+	subscriptionRegistry map[string]Subscription
 }
 
 // New returns a new blocknative websocket client
@@ -63,12 +61,12 @@ func New(ctx context.Context, opts Opts) (*Client, error) {
 	}
 	if out.Status != "ok" {
 		cancel()
-		return nil, errors.Errorf("failed to initialize websockets connection reason: %v", out.Reason)
+		return nil, fmt.Errorf("failed to initialize websockets connection reason: %v", out.Reason)
 	}
 	if opts.PrintConnectResponse {
 		log.Printf("%+v\n", out)
 	}
-	return &Client{conn: c, ctx: ctx, cancel: cancel, apiKey: opts.APIKey}, nil
+	return &Client{conn: c, ctx: ctx, cancel: cancel, apiKey: opts.APIKey, subscriptionRegistry: make(map[string]Subscription)}, nil
 }
 
 // Initialize is used to handle blocknative websockets api initialization
@@ -89,7 +87,7 @@ func (c *Client) Initialize(msg BaseMessage) error {
 		return err
 	}
 	if out.Status != "ok" {
-		return errors.Errorf("failed to initialize api connection reason:%v", out.Reason)
+		return fmt.Errorf("failed to initialize api connection reason:%v", out.Reason)
 	}
 	return nil
 }
@@ -103,14 +101,46 @@ func (c *Client) EventSub(msg Configuration) error {
 	}
 
 	var out ConnectResponse
-	err := c.conn.ReadJSON(&out)
-	if err != nil {
+	if err := c.conn.ReadJSON(&out); err != nil {
 		return err
 	}
 	if out.Status != "ok" {
-		return errors.Errorf("failed to create subscription reason:%v", out.Reason)
+		return fmt.Errorf("failed to create subscription reason:%v", out.Reason)
 	}
 
+	return nil
+}
+
+// APIKey returns the api key being used by the client
+func (c *Client) APIKey() string {
+	return c.apiKey
+}
+
+func (c *Client) SubscriptionRegistry() map[string]Subscription {
+	return c.subscriptionRegistry
+}
+
+func (c *Client) NewAddressSubscription(address string) error {
+	if err := c.WriteJSON(NewAddressSubscribe(
+		c.initMsg,
+		address,
+	)); err != nil {
+		return err
+	}
+	c.subscriptionRegistry[address] = NewEventSubscription(address)
+	go eventLoop(c, c.subscriptionRegistry[address], NewAddressUnsubscribe(c.initMsg, address))
+	return nil
+}
+
+func (c *Client) NewTransactionSubscription(txHash string) error {
+	if err := c.WriteJSON(NewTxSubscribe(
+		c.initMsg,
+		txHash,
+	)); err != nil {
+		return err
+	}
+	c.subscriptionRegistry[txHash] = NewEventSubscription(txHash)
+	go eventLoop(c, c.subscriptionRegistry[txHash], NewTxUnsubscribe(c.initMsg, txHash))
 	return nil
 }
 
@@ -128,11 +158,6 @@ func (c *Client) WriteJSON(out interface{}) error {
 	return c.conn.WriteJSON(out)
 }
 
-// APIKey returns the api key being used by the client
-func (c *Client) APIKey() string {
-	return c.apiKey
-}
-
 // Close is used to terminate our websocket client
 func (c *Client) Close() error {
 	err := c.conn.WriteMessage(
@@ -141,37 +166,4 @@ func (c *Client) Close() error {
 	)
 	c.cancel()
 	return err
-}
-
-func NetName(id int64) (string, error) {
-	var netName string
-	switch id {
-	case 1:
-		netName = "main"
-	case 4:
-		netName = "rinkeby"
-	case 5:
-		netName = "goerli"
-
-	default:
-		return "", errors.Errorf("network not supported id:%v", id)
-	}
-	return netName, nil
-}
-
-func ParseGas(msg *EthTxPayload) (gasBaseFeeGwei, gasTipGwei float64, err error) {
-	gasBaseFee, err := strconv.ParseFloat(msg.Event.Transaction.MaxFeePerGas, 64)
-	if err != nil {
-		return 0, 0, errors.Wrapf(err, "parsing  gas base fee:%v", msg.Event.Transaction.MaxPriorityFeePerGas)
-	}
-
-	gasBaseFeeGwei = gasBaseFee / params.GWei
-
-	gasTip, err := strconv.ParseFloat(msg.Event.Transaction.MaxPriorityFeePerGas, 64)
-	if err != nil {
-		return 0, 0, errors.Wrapf(err, "parsing gas tip:%v", msg.Event.Transaction.MaxPriorityFeePerGas)
-	}
-	gasTipGwei = gasTip / params.GWei
-
-	return gasBaseFeeGwei, gasTipGwei, nil
 }

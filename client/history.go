@@ -7,7 +7,7 @@ import "sync"
 // our state
 type MsgHistory struct {
 	mx     sync.RWMutex
-	buffer []interface{}
+	buffer []interface{} // TODO use channel instead of array
 }
 
 // Push is used to push a message onto our buffer

@@ -1,7 +1,6 @@
 package client
 
 import (
-	"os"
 	"time"
 )
 
@@ -19,11 +18,6 @@ type BaseMessage struct {
 type Blockchain struct {
 	System  string `json:"system"`
 	Network string `json:"network"`
-}
-
-// Subscription implements
-type Subscrption interface {
-	BaseMessage()
 }
 
 // TxSubscribe is used to subscribe/unsubscribe to transaction id events
@@ -169,20 +163,5 @@ func NewAddressUnsubscribe(msg BaseMessage, address string) AddressSubscribe {
 	return AddressSubscribe{
 		BaseMessage: msg,
 		Account:     Account{Address: address},
-	}
-}
-
-// NewBaseMessageMainnet returns a base message suitable for mainnet usage
-func NewBaseMessageMainnet(apiKey string) BaseMessage {
-	if apiKey == "" {
-		apiKey = os.Getenv("BLOCKNATIVE_DAPP_ID")
-	}
-	return BaseMessage{
-		Timestamp: time.Now(),
-		DappID:    apiKey,
-		Blockchain: Blockchain{
-			System:  "ethereum",
-			Network: "main",
-		},
 	}
 }

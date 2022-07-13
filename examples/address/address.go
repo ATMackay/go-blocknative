@@ -4,9 +4,9 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/ATMackay/go-blocknative/client"
-	"github.com/gorilla/websocket"
 )
 
 func main() {
@@ -30,31 +30,17 @@ func main() {
 	if err := cl.Initialize(client.NewBaseMessageMainnet(cl.APIKey())); err != nil {
 		panic(err)
 	}
+	address := "0xdac17f958d2ee523a2206206994597c13d831ec7"
 	// subscribe to events by address
-	if err := cl.WriteJSON(client.NewAddressSubscribe(
-		client.NewBaseMessageMainnet(
-			cl.APIKey(),
-		),
-		"0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0",
-	)); err != nil {
+	if err := cl.NewAddressSubscription(address); err != nil {
 		panic(err)
 	}
 	// read messages in a loop
-	for {
-		var msg client.EthTxPayload
-		if err := cl.ReadJSON(&msg); err != nil {
-			if err := cl.ReadJSON(msg); err != nil {
-				if e, ok := err.(*websocket.CloseError); ok {
-					if e.Code != 1000 {
-						log.Fatal("mempMon read", err)
-					}
-				}
-				return
-			} else {
-				log.Println("receive expected close message: ", err)
-				continue
-			}
-		}
-		log.Printf("receive message:\n%+v\n", msg)
+	s := cl.SubscriptionRegistry()[address]
+	defer func() { s.Unsubscribe() }()
+
+	for i := 0; i < 10; i++ {
+		log.Printf("receive message:\n%v\n", s.PopAll()...)
+		time.Sleep(2 * time.Second)
 	}
 }
