@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// NetName converts chain ID to network name (string)
 func NetName(id int64) (string, error) {
 	var netName string
 	switch id {

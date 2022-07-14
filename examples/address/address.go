@@ -41,6 +41,9 @@ func main() {
 	eventChan := s.Events()
 	var counter int
 	for {
+		if counter == 5 {
+			break
+		}
 		counter++
 		e, ok := <-eventChan
 		if !ok {
@@ -50,11 +53,9 @@ func main() {
 		jev, _ := json.MarshalIndent(ev, "", "  ")
 		log.Printf("receive message:\n%v\n", string(jev))
 		time.Sleep(5 * time.Second)
-		if counter == 5 {
-			break
-		}
+
 	}
 	fmt.Println("unsubscribing")
-	s.Unsubscribe()
+	cl.KillSubscription(address)
 	time.Sleep(5 * time.Second)
 }

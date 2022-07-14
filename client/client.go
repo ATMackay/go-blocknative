@@ -122,6 +122,10 @@ func (c *Client) NewEventSubscription(msg Configuration) error {
 	return nil
 }
 
+// NewAddressSubscription creates a new subscription to blocknative
+// for monitoring address activity. the subscription is added to the
+// client's subscription registry which contains an event channel
+// for watched events provided by blocknative servers
 func (c *Client) NewAddressSubscription(address string) error {
 	if err := c.WriteJSON(NewAddressSubscribe(
 		c.initMsg,
@@ -134,6 +138,8 @@ func (c *Client) NewAddressSubscription(address string) error {
 	return nil
 }
 
+// NewTransactionSubscription creates a new subscription for monitoring
+// a transaction by supplied transaction ID
 func (c *Client) NewTransactionSubscription(txHash string) error {
 	if err := c.WriteJSON(NewTxSubscribe(
 		c.initMsg,
@@ -144,6 +150,19 @@ func (c *Client) NewTransactionSubscription(txHash string) error {
 	c.subscriptionRegistry[txHash] = NewSubscription(txHash)
 	go eventLoop(c, c.subscriptionRegistry[txHash], NewTxUnsubscribe(c.initMsg, txHash))
 	return nil
+}
+
+// KillSubscription unsubscribes from the subscription in the registry
+// at the index supplied. Killing the subscription releases the resource for the Client
+// as well notifying block native servers to not monitor for events tracked by the subscription
+func (c *Client) KillSubscription(key string) {
+	sub, ok := c.subscriptionRegistry[key]
+	if !ok {
+		// no subscription found
+		return
+	}
+	sub.Unsubscribe()
+	delete(c.subscriptionRegistry, key)
 }
 
 // ReadJSON is a wrapper around Conn:ReadJSON

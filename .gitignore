@@ -2,4 +2,4 @@
 ./go-blocknative
 
 gb-cli
-.env
+*.env

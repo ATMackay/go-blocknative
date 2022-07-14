@@ -9,7 +9,8 @@ import (
 
 var subscriptionSleep = 5 * time.Second
 
-// Subscription
+// Subscription represents a stream of events. Implementations
+// carry a channel with which to store events returned by the subscription backend
 type Subscription interface {
 	Events() chan interface{}
 	Unsubscribe()
@@ -54,6 +55,7 @@ type subscription struct {
 	errChan   chan error
 }
 
+// NewSubscription creates a carrier for tracking events
 func NewSubscription(key string) *subscription {
 	return &subscription{key: key, eventChan: make(chan interface{}), errChan: make(chan error, 1)}
 }
