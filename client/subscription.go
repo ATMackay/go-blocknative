@@ -2,32 +2,32 @@ package client
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-// Subscription implements
+var subscriptionSleep = 5 * time.Second
+
+// Subscription
 type Subscription interface {
-	Push(interface{})
-	Pop() interface{}
-	PopAll() []interface{}
+	Events() chan interface{}
 	Unsubscribe()
 	Err() chan error
 }
 
 func eventLoop(cl *Client, sub Subscription, unsubMsg interface{}) {
+	e := sub.Events()
 	defer func() {
 		sub.Unsubscribe()
 		cl.WriteJSON(unsubMsg)
+		close(e)
 	}()
 	for {
 		select {
 		case <-sub.Err():
 			return
 		default:
-			time.Sleep(5 * time.Second)
 			var msg EthTxPayload
 			if err := cl.ReadJSON(&msg); err != nil {
 				if err := cl.ReadJSON(msg); err != nil {
@@ -42,84 +42,30 @@ func eventLoop(cl *Client, sub Subscription, unsubMsg interface{}) {
 					break
 				}
 			}
-			sub.Push(msg)
+			e <- msg
 		}
+		time.Sleep(subscriptionSleep)
 	}
 }
 
-type EventSubscription struct {
-	key     string // address or txHash
-	history *MsgHistory
-	errChan chan error
+type subscription struct {
+	key       string // address or txHash
+	eventChan chan interface{}
+	errChan   chan error
 }
 
-func NewEventSubscription(key string) EventSubscription {
-	return EventSubscription{key: key, history: &MsgHistory{mx: sync.RWMutex{}, buffer: make([]interface{}, 0)}, errChan: make(chan error, 1)}
+func NewSubscription(key string) *subscription {
+	return &subscription{key: key, eventChan: make(chan interface{}), errChan: make(chan error, 1)}
 }
 
-func (a EventSubscription) Push(msg interface{}) {
-	a.history.Push(msg)
+func (a *subscription) Events() chan interface{} {
+	return a.eventChan
 }
 
-func (a EventSubscription) Pop() interface{} {
-	return a.history.Pop()
-}
-
-func (a EventSubscription) PopAll() []interface{} {
-	return a.history.PopAll()
-}
-
-func (a EventSubscription) Unsubscribe() {
+func (a *subscription) Unsubscribe() {
 	a.errChan <- fmt.Errorf("subscription closed")
 }
 
-func (a EventSubscription) Err() chan error {
+func (a *subscription) Err() chan error {
 	return a.errChan
 }
-
-/*
-// NewSubscription runs a producer function as a subscription in a new goroutine. The
-// channel given to the producer is closed when Unsubscribe is called. If fn returns an
-// error, it is sent on the subscription's error channel.
-func NewSubscription(producer func(<-chan struct{}) error) Subscription {
-	s := &funcSub{unsub: make(chan struct{}), err: make(chan error, 1)}
-	go func() {
-		defer close(s.err)
-		err := producer(s.unsub)
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		if !s.unsubscribed {
-			if err != nil {
-				s.err <- err
-			}
-			s.unsubscribed = true
-		}
-	}()
-	return s
-}
-
-type funcSub struct {
-	unsub        chan struct{}
-	err          chan error
-	mu           sync.Mutex
-	unsubscribed bool
-}
-
-func (s *funcSub) Unsubscribe() {
-	s.mu.Lock()
-	if s.unsubscribed {
-		s.mu.Unlock()
-		return
-	}
-	s.unsubscribed = true
-	close(s.unsub)
-	s.mu.Unlock()
-	// Wait for producer shutdown.
-	<-s.err
-}
-
-func (s *funcSub) Err() <-chan error {
-	return s.err
-}
-
-*/

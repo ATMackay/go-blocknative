@@ -92,32 +92,34 @@ func (c *Client) Initialize(msg BaseMessage) error {
 	return nil
 }
 
-// EventSub creates an event subscription.
-func (c *Client) EventSub(msg Configuration) error {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-	if err := c.conn.WriteJSON(&msg); err != nil {
+// APIKey returns the api key being used by the client
+func (c *Client) APIKey() string {
+	return c.apiKey
+}
+
+// SubscriptionRegistry returns the chached subscription map
+func (c *Client) SubscriptionRegistry() map[string]Subscription {
+	return c.subscriptionRegistry
+}
+
+// NewEventSubscription creates an event subscription.
+func (c *Client) NewEventSubscription(msg Configuration) error {
+	if err := c.WriteJSON(&msg); err != nil {
 		return err
 	}
-
 	var out ConnectResponse
-	if err := c.conn.ReadJSON(&out); err != nil {
+	if err := c.ReadJSON(&out); err != nil {
 		return err
 	}
 	if out.Status != "ok" {
 		return fmt.Errorf("failed to create subscription reason:%v", out.Reason)
 	}
 
+	key := msg.Scope
+	c.subscriptionRegistry[key] = NewSubscription(key)
+	go eventLoop(c, c.subscriptionRegistry[key], NewEventUnsubscribe(c.initMsg, msg.Config))
+
 	return nil
-}
-
-// APIKey returns the api key being used by the client
-func (c *Client) APIKey() string {
-	return c.apiKey
-}
-
-func (c *Client) SubscriptionRegistry() map[string]Subscription {
-	return c.subscriptionRegistry
 }
 
 func (c *Client) NewAddressSubscription(address string) error {
@@ -127,7 +129,7 @@ func (c *Client) NewAddressSubscription(address string) error {
 	)); err != nil {
 		return err
 	}
-	c.subscriptionRegistry[address] = NewEventSubscription(address)
+	c.subscriptionRegistry[address] = NewSubscription(address)
 	go eventLoop(c, c.subscriptionRegistry[address], NewAddressUnsubscribe(c.initMsg, address))
 	return nil
 }
@@ -139,7 +141,7 @@ func (c *Client) NewTransactionSubscription(txHash string) error {
 	)); err != nil {
 		return err
 	}
-	c.subscriptionRegistry[txHash] = NewEventSubscription(txHash)
+	c.subscriptionRegistry[txHash] = NewSubscription(txHash)
 	go eventLoop(c, c.subscriptionRegistry[txHash], NewTxUnsubscribe(c.initMsg, txHash))
 	return nil
 }

@@ -126,6 +126,16 @@ func NewConfiguration(msg BaseMessage, config Config) Configuration {
 	}
 }
 
+// NewEventUnsubscribe constructs an Event unsubscribe message
+func NewEventUnsubscribe(msg BaseMessage, config Config) Configuration {
+	msg.CategoryCode = "configs"
+	msg.EventCode = "unwatch"
+	return Configuration{
+		BaseMessage: msg,
+		Config:      config,
+	}
+}
+
 // NewTxSubscribe constructs a Transaction subscription message
 func NewTxSubscribe(msg BaseMessage, txHash string) TxSubscribe {
 	msg.CategoryCode = "activeTransaction"

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -10,7 +12,6 @@ import (
 )
 
 func main() {
-
 	// create the base client struct
 	cl, err := client.New(context.Background(), client.Opts{
 		Scheme: "wss",
@@ -37,10 +38,23 @@ func main() {
 	}
 	// read messages in a loop
 	s := cl.SubscriptionRegistry()[address]
-	defer func() { s.Unsubscribe() }()
-
-	for i := 0; i < 10; i++ {
-		log.Printf("receive message:\n%v\n", s.PopAll()...)
-		time.Sleep(2 * time.Second)
+	eventChan := s.Events()
+	var counter int
+	for {
+		counter++
+		e, ok := <-eventChan
+		if !ok {
+			break
+		}
+		ev := e.(client.EthTxPayload)
+		jev, _ := json.MarshalIndent(ev, "", "  ")
+		log.Printf("receive message:\n%v\n", string(jev))
+		time.Sleep(5 * time.Second)
+		if counter == 5 {
+			break
+		}
 	}
+	fmt.Println("unsubscribing")
+	s.Unsubscribe()
+	time.Sleep(5 * time.Second)
 }

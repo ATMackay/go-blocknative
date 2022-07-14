@@ -11,11 +11,22 @@ func NetName(id int64) (string, error) {
 	switch id {
 	case 1:
 		netName = "main"
+	case 3:
+		netName = "ropsten"
 	case 4:
 		netName = "rinkeby"
 	case 5:
 		netName = "goerli"
-
+	case 42:
+		netName = "kovan"
+	case 56:
+		netName = "bsc-main"
+	case 100:
+		netName = "xdai"
+	case 137:
+		netName = "matic-main"
+	case 250:
+		netName = "fantom-main"
 	default:
 		return "", fmt.Errorf("network not supported id: %v", id)
 	}
@@ -37,7 +48,7 @@ func NewBaseMessageMainnet(apiKey string) BaseMessage {
 	}
 }
 
-// NewBaseMessage returns a base message for the network ID supplied
+// NewBaseMessage returns a base message for the supplied network ID
 func NewBaseMessage(apiKey string, netID int64) (BaseMessage, error) {
 	if apiKey == "" {
 		apiKey = os.Getenv("BLOCKNATIVE_DAPP_ID")
