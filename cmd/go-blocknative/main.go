@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/ATMackay/go-blocknative/client"
-	"github.com/gorilla/websocket"
 	"github.com/urfave/cli/v2"
 )
 
@@ -69,32 +72,31 @@ func main() {
 			Subcommands: cli.Commands{
 				&cli.Command{
 					Name:  "address",
-					Usage: "subscribe to events based on addresse",
+					Usage: "subscribe to events based on address",
 					Action: func(c *cli.Context) error {
-						if err := apiClient.WriteJSON(client.NewAddressSubscribe(
-							client.NewBaseMessageMainnet(
-								c.String("api.key"),
-							),
-							c.String("address"),
-						)); err != nil {
-							return err
-						}
-						for {
-							var out client.EthTxPayload
-							if err := apiClient.ReadJSON(&out); err != nil {
-								// used to ignore the following event
-								// websocket: close 1005 (no status)
-								if websocket.IsUnexpectedCloseError(err, 1005) {
-									log.Println("receive unexpected close, exiting: ", err)
+						address := c.String("address")
+						apiClient.NewAddressSubscription(address)
+						s := apiClient.SubscriptionRegistry()[address]
+						eventChan := s.Events()
+						go func() {
+							for {
+								e, ok := <-eventChan
+								if !ok {
 									break
-								} else {
-									log.Println("receive expected close message: ", err)
-									continue
 								}
+								ev := e.(client.EthTxPayload)
+								jev, _ := json.Marshal(ev)
+								log.Printf("receive message:\n%v\n", string(jev))
+								time.Sleep(5 * time.Second)
 							}
-							log.Printf("receive message:\n%+v\n", out)
-						}
-						defer apiClient.Close()
+						}()
+						// start the signal handler
+						signalChan := make(chan os.Signal, 1)
+						signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+						sig := <-signalChan
+						log.Printf("received shutdown signal '%v', unsubscribing...\n", sig)
+						apiClient.KillSubscription(address)
+						log.Printf("bye!\n")
 						return nil
 					},
 				},
